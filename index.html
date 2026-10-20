@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Electronics Lab</title>
+  <meta name="description" content="Graphical electronics simulator with ICs, measurements, oscilloscope and CircuiTikZ export.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M5 16h5l2-6 4 12 3-9 2 3h6' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M5 16h5l2-6 4 12 3-9 2 3h6" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <span>Electronics Lab</span>
+    </div>
+
+    <div class="tb-group">
+      <button class="tb-btn" id="btnNew" data-icon="new" title="New circuit"></button>
+      <button class="tb-btn" id="btnOpen" data-icon="open" title="Open circuit or IC file (⌘O)"></button>
+      <button class="tb-btn" id="btnSave" data-icon="save" title="Save circuit (⌘S)"></button>
+      <button class="tb-btn text" id="btnExamples" data-icon="book" title="Example circuits"><span>Examples</span></button>
+    </div>
+
+    <div class="tb-group">
+      <button class="tb-btn" id="btnUndo" data-icon="undo" title="Undo (⌘Z)"></button>
+      <button class="tb-btn" id="btnRedo" data-icon="redo" title="Redo (⇧⌘Z)"></button>
+    </div>
+
+    <div class="tb-group seg-tools">
+      <button class="tb-btn" id="toolSelect" data-icon="cursor" title="Select / move (V)"></button>
+      <button class="tb-btn" id="toolWire" data-icon="wire" title="Draw wires (W)"></button>
+    </div>
+
+    <div class="tb-group">
+      <button class="tb-btn" id="btnRotate" data-icon="rotate" title="Rotate (R)"></button>
+      <button class="tb-btn" id="btnFlip" data-icon="flip" title="Flip (F)"></button>
+      <button class="tb-btn" id="btnDelete" data-icon="trash" title="Delete (⌫)"></button>
+    </div>
+
+    <div class="tb-group sim-group">
+      <button class="run-btn" id="btnRun" title="Run / pause (Space)"></button>
+      <button class="tb-btn" id="btnStep" data-icon="step" title="Step one scope division"></button>
+      <button class="tb-btn" id="btnReset" data-icon="reset" title="Reset simulation to t = 0"></button>
+      <div class="speed" title="Simulation speed: simulated time per real second">
+        <input type="range" id="speedRange" min="0" max="100" step="1">
+        <span id="speedLabel" class="mono">10 ms/s</span>
+      </div>
+    </div>
+
+    <div class="tb-spacer"></div>
+
+    <div class="tb-group">
+      <button class="tb-btn text" id="btnIC" data-icon="chip" title="Design a custom IC"><span>New IC</span></button>
+      <button class="tb-btn text accent" id="btnTikz" data-icon="code" title="Export to CircuiTikZ (LaTeX)"><span>CircuiTikZ</span></button>
+    </div>
+    <div class="tb-group">
+      <button class="tb-btn" id="btnView" data-icon="sliders" title="Display options"></button>
+      <button class="tb-btn" id="btnTheme" title="Toggle theme"></button>
+      <button class="tb-btn" id="btnHelp" data-icon="help" title="Help & shortcuts (?)"></button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="palette">
+      <div class="pal-search">
+        <span data-icon="search"></span>
+        <input id="paletteSearch" type="search" placeholder="Search components…" autocomplete="off">
+      </div>
+      <div class="pal-list" id="paletteList"></div>
+    </aside>
+
+    <main class="center">
+      <div class="canvas-wrap">
+        <canvas id="schematic" tabindex="0"></canvas>
+        <div id="tooltip" class="tooltip" hidden></div>
+        <div class="hud">
+          <button class="hud-btn" id="zoomOut" data-icon="minus" title="Zoom out (−)"></button>
+          <span id="statusZoom" class="hud-zoom">100%</span>
+          <button class="hud-btn" id="zoomIn" data-icon="plus" title="Zoom in (+)"></button>
+          <button class="hud-btn" id="zoomFit" data-icon="fit" title="Zoom to fit (0)"></button>
+        </div>
+        <div id="simError" class="sim-error" hidden>
+          <div class="sim-error-ico">!</div>
+          <div><b>Simulation stopped</b><div class="msg"></div></div>
+          <button class="btn sm" id="errReset">Reset</button>
+        </div>
+      </div>
+      <div class="splitter" id="splitter" title="Drag to resize · double-click to collapse"></div>
+      <section class="scope" id="scope">
+        <div class="scope-head">
+          <div class="ptabs" id="panelTabs">
+            <button class="ptab on" data-tab="scope"><span data-icon="scope"></span>Oscilloscope</button>
+            <button class="ptab" data-tab="table"><span data-icon="table"></span>Data table<span class="ptab-count" id="dtCount">0</span></button>
+          </div>
+          <div class="scope-ctrls" data-pane="scope">
+            <div class="seg sm" id="scopeDisplay" title="Analog traces or logic-analyser lanes">
+              <button data-disp="analog">Analog</button>
+              <button data-disp="digital">Digital</button>
+            </div>
+            <label class="mini-field dig-only" title="Logic threshold for voltage channels">V<sub>th</sub>
+              <input id="digTh" class="inp sm num th-inp" spellcheck="false">
+            </label>
+            <label class="mini-field dig-only" title="Show the channels as a binary bus value (CH1 = bit 0)">
+              <input type="checkbox" id="digBus" class="switch sm">Bus
+            </label>
+            <select id="scopeTdiv" class="inp sm tdiv" title="Time per division"></select>
+            <div class="seg sm" id="scopeMode">
+              <button data-mode="roll">Roll</button>
+              <button data-mode="trigger">Trigger</button>
+            </div>
+            <button class="btn sm ghost" id="scopeAuto" title="Choose a time base automatically">Auto</button>
+            <button class="btn sm ghost" id="scopeClear">Clear</button>
+          </div>
+          <div class="scope-ctrls" data-pane="table" hidden>
+            <button class="btn sm primary" id="dtRecord" data-icon="record" title="Store the current values as a new row (M)">Record</button>
+            <label class="mini-field" title="Record a row automatically at a fixed simulation-time interval">
+              <input type="checkbox" id="dtAuto" class="switch sm">Auto every
+              <select id="dtAutoDt" class="inp sm"></select>
+            </label>
+            <button class="btn sm ghost" id="dtSweep" data-icon="sweep" title="Step a component value and record a row per step">Sweep…</button>
+            <button class="btn sm ghost" id="dtAddCol" data-icon="plus">Column</button>
+            <button class="btn sm ghost" id="dtCsv" data-icon="download" title="Export as CSV (Excel, Python, MATLAB …)">CSV</button>
+            <button class="btn sm ghost" id="dtClear">Clear</button>
+          </div>
+          <button class="icon-btn sm" id="scopeToggle" data-icon="chevron" title="Collapse / expand"></button>
+        </div>
+        <div class="scope-body" data-pane="scope">
+          <div class="scope-channels" id="scopeChannels"></div>
+          <div class="scope-screen"><canvas id="scopeCanvas"></canvas></div>
+        </div>
+        <div class="table-body" data-pane="table" hidden>
+          <div class="dt-grid" id="dtGrid"></div>
+          <div class="dt-plot">
+            <div class="dt-plot-ctrls" id="dtPlotCtrls"></div>
+            <div class="dt-plot-wrap"><canvas id="dtPlot"></canvas></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="inspector" id="inspector"></aside>
+  </div>
+
+  <footer class="statusbar">
+    <span id="statusSim" class="st-sim">Paused</span>
+    <span id="statusTime" class="mono"></span>
+    <span id="statusDt" class="mono muted"></span>
+    <span id="statusConv" class="muted"></span>
+    <span id="statusHint" class="st-hint"></span>
+  </footer>
+</div>
+
+<div id="ctxMenu" class="ctx-menu" hidden></div>
+<div id="modalRoot"></div>
+<div id="toasts" class="toasts"></div>
+<input type="file" id="fileInput" accept=".json,application/json" hidden>
+
+<script src="js/util.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/ics.js"></script>
+<script src="js/components.js"></script>
+<script src="js/circuit.js"></script>
+<script src="js/render.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/scope.js"></script>
+<script src="js/datatable.js"></script>
+<script src="js/tikz.js"></script>
+<script src="js/examples.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
